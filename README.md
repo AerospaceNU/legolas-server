@@ -37,8 +37,8 @@ This repository uses Python 3.12 and [pipenv](https://pipenv.pypa.io/en/latest/)
     ```
 - Now, run 
     ```bash 
-    pipenv install --dev
-    pipenv shell
+    python -m pipenv install --dev
+    python -m pipenv shell
     ```
     to install all dependencies and activate the environment. 
 - Your shell should now look something like
