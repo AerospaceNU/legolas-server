@@ -1,0 +1,30 @@
+default_language_version:
+    python: python3
+repos:
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.1.1
+    hooks:
+    - id: flake8
+      entry: flake8 src test
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        entry: black src test
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: pytest-check
+        entry: pytest test
+        language: system
+        pass_filenames: false
+        always_run: true
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+    -   id: mypy
+        entry: mypy
