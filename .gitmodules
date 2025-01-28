@@ -1,0 +1,3 @@
+[submodule "src/legolas_common"]
+	path = src/legolas_common
+	url = git@github.com:AerospaceNU/legolas_common.git

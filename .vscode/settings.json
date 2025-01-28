@@ -13,4 +13,5 @@
     ],
     "python.terminal.activateEnvInCurrentTerminal": true,
     "python.terminal.shellIntegration.enabled": false,
+    "autoDocstring.docstringFormat": "google-notypes",
 }
