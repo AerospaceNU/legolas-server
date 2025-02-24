@@ -7,7 +7,7 @@ from legolas_common.src.socket_client import SocketClient
 if __name__ == "__main__":
     outgoing_data: Queue[Packet] = Queue()
     received_data: Queue[Packet] = Queue()
-    client = SocketClient("127.0.0.1", 12348, outgoing_data, received_data)
+    client = SocketClient("127.0.0.1", 12345, outgoing_data, received_data)
     prev_update_time = 0.0
 
     client.run()
