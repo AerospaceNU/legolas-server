@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 opencv-python = "*"
 opencv-contrib-python = "*"
+python-can = "*"
+pyserial = "*"
 
 [dev-packages]
 isort = "*"

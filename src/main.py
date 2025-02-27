@@ -1,6 +1,7 @@
 from queue import Queue
 
 from camera_interface import CameraCapture, CameraType
+from gimbal.ronin_controller import RoninController
 from legolas_common.src.packet_types import BROADCAST_DEST, Packet, PacketType
 from legolas_common.src.socket_server import SocketServer
 
@@ -10,6 +11,8 @@ def main() -> None:
 
     outgoing_data: Queue[Packet] = Queue()
     received_data: Queue[Packet] = Queue()
+    ronin = RoninController("can0")
+    yaw = 0
 
     server = SocketServer("127.0.0.1", 12345, outgoing_data, received_data)
     server.run()
@@ -32,6 +35,10 @@ def main() -> None:
                     print("Received image")
                 else:
                     print("Received ack: {msg.payload}")
+            yaw += 1
+            if yaw == 360:
+                yaw = 0
+            ronin.set_position_control(yaw, 0, 0)
     except KeyboardInterrupt:
         cam.shutdown()
         server.shutdown()
