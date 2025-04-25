@@ -1,3 +1,6 @@
 [submodule "src/legolas_common"]
 	path = src/legolas_common
 	url = git@github.com:AerospaceNU/legolas_common.git
+[submodule "src/legolas_tracking"]
+	path = src/legolas_tracking
+	url = git@github.com:AerospaceNU/legolas_tracking.git

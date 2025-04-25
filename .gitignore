@@ -4,3 +4,7 @@ build
 dist
 .mypy_cache
 .DS_Store
+*.mov
+*.MOV 
+*.pt 
+*.mp4

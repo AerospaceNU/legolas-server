@@ -1,6 +1,11 @@
+import time
+from asyncio import Lock
 from enum import Enum, auto
+from threading import Thread
 
 import cv2
+
+from video_input import VideoInput
 
 
 class CameraType(Enum):
@@ -12,13 +17,17 @@ class CameraType(Enum):
     """NVIDIA Argus gstreamer capture (the tracking camera connected with ribbon cable)"""
 
 
-class CameraCapture:
+class CameraCapture(VideoInput):
 
-    def __init__(self):
+    def __init__(self, camera_type: CameraType):
         self.cap = None
+        self.running = False
+        self.thread = Thread(target=self._run)
+        self.lock = Lock()
+        self.camera_type = camera_type
 
-    def start(self, camera_type: CameraType):
-        if camera_type == CameraType.NVARGUS:
+    def start(self):
+        if self.camera_type == CameraType.NVARGUS:
             make_cap = lambda: cv2.VideoCapture(
                 (
                     "nvarguscamerasrc ! video/x-raw(memory:NVMM), "
@@ -27,22 +36,29 @@ class CameraCapture:
                 ),
                 cv2.CAP_GSTREAMER,
             )
-        elif camera_type == CameraType.WEBCAM:
+        elif self.camera_type == CameraType.WEBCAM:
             make_cap = lambda: cv2.VideoCapture(0)
         else:
             raise ValueError("Invalid camera type")
         self.cap = make_cap()
         if not self.cap.isOpened():
             raise ValueError("Error: Unable to access the webcam.")
+        _, self.frame = self.cap.read()
+        self.running = True
+        self.thread.start()
+
+    def _run(self):
+        while self.running:
+            _, cap_frame = self.cap.read()
+            with self.lock():
+                self.frame = cap_frame
+            time.sleep(0.00001)
 
     def get_frame(self):
-        # Capture a frame from the webcam
-        ret, frame = self.cap.read()
-        if not ret:
-            raise ValueError("Failed to capture frame. Exiting...")
 
-        # Return the frame
-        return frame
+        return self.frame
 
     def shutdown(self):
+        self.running = False
+        self.thread.join()
         self.cap.release()
