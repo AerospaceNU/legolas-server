@@ -46,7 +46,7 @@ def main() -> None:
                 elif msg.packet_type == PacketType.IMAGE:
                     print("Received image")
                 else:
-                    print("Received ack: {msg.payload}")
+                    print(f"Received ack: {msg.payload}")
             yaw += 1
             if yaw == 360:
                 yaw = 0
