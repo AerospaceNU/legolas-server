@@ -1,7 +1,6 @@
 import time
-from asyncio import Lock
 from enum import Enum, auto
-from threading import Thread
+from threading import Lock, Thread
 
 import cv2
 
@@ -50,7 +49,7 @@ class CameraCapture(VideoInput):
     def _run(self):
         while self.running:
             _, cap_frame = self.cap.read()
-            with self.lock():
+            with self.lock:
                 self.frame = cap_frame
             time.sleep(0.00001)
 

@@ -1,18 +1,13 @@
 import time
 from queue import Queue
 
-import cv2
-
 from camera_interface import CameraCapture, CameraType
-from frame_annotator import draw_tracked_object
-from gimbal.ronin_controller import RoninController
+from legolas_common.src.frame_annotator import draw_tracked_object
 from legolas_common.src.packet_types import BROADCAST_DEST, Packet, PacketType
 from legolas_common.src.socket_server import SocketServer
-from legolas_tracking.naive_object_tracker import NaiveObjectTracker
-from legolas_tracking.norfair_object_tracker import NorfairObjectTracker
-from legolas_tracking.yolo_model import YoloModel
+from tracking.norfair_object_tracker import NorfairObjectTracker
+from tracking.yolo_model import YoloModel
 from video_input import VideoInput
-from video_reader import VideoReader
 
 
 def main() -> None:
@@ -25,12 +20,12 @@ def main() -> None:
 
     server = SocketServer("127.0.0.1", 12345, outgoing_data, received_data)
     server.run()
-    # cam: VideoInput = CameraCapture(CameraType.WEBCAM)
-    cam = VideoReader("IMG_3061.MOV", rotation=cv2.ROTATE_90_CLOCKWISE)
+    cam: VideoInput = CameraCapture(CameraType.WEBCAM)
+    # cam = VideoReader("IMG_3061.MOV", rotation=cv2.ROTATE_90_CLOCKWISE)
     cam.start()
 
-    norfair_model = NaiveObjectTracker()
-    yolo_model = YoloModel(norfair_model, "best_large_1024.pt")
+    norfair_model = NorfairObjectTracker()
+    yolo_model = YoloModel(norfair_model, "yolo11n.pt")
 
     try:
         while True:

@@ -1,11 +1,17 @@
 import time
 from typing import Callable
 
-from gimbal.ronin_controller import RoninController
-
 
 class PIDGimbalController:
-    def __init__(self, Kp, Ki, Kd, control_callback: Callable[[float], None], output_degree_min: int | None = None, output_degree_max: int | None = None):
+    def __init__(
+        self,
+        Kp,
+        Ki,
+        Kd,
+        control_callback: Callable[[float], None],
+        output_degree_min: int | None = None,
+        output_degree_max: int | None = None,
+    ):
 
         self.Kp = Kp
         self.Ki = Ki
@@ -23,7 +29,7 @@ class PIDGimbalController:
         current_time = time.time()
         dt = current_time - self.last_time
         if dt <= 0:  # Prevent division by zero
-            dt = 1e-6  
+            dt = 1e-6
 
         error = pixel_err
 

@@ -2,7 +2,6 @@ import threading
 import time
 
 import cv2
-from sympy import rotations
 
 from video_input import VideoInput
 
@@ -21,7 +20,7 @@ class VideoReader(VideoInput):
 
         self.cap = cv2.VideoCapture(self.video_path)
         if not self.cap.isOpened():
-            raise ValueError(f"Cannot open video file: { self.video_path}")
+            raise ValueError(f"Cannot open video file: {self.video_path}")
 
         self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30  # fallback to 30 FPS
         self.frame_duration = 1.0 / self.fps
