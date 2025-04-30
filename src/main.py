@@ -16,7 +16,6 @@ def main() -> None:
     outgoing_data: Queue[Packet] = Queue()
     received_data: Queue[Packet] = Queue()
     # ronin = RoninController("can0")
-    yaw = 0
 
     server = SocketServer("127.0.0.1", 12345, outgoing_data, received_data)
     server.run()
@@ -25,16 +24,22 @@ def main() -> None:
     cam.start()
 
     norfair_model = NorfairObjectTracker()
-    yolo_model = YoloModel(norfair_model, "yolo11n.pt")
+    yolo_model = YoloModel(norfair_model, "yolo11l.pt")
+
+    transmit_delay = 1 / 20
+    previous_transmit_time = time.time()
 
     try:
         while True:
 
             frame_data = cam.get_frame()
             detections = yolo_model.update(frame_data)
-            for obj in detections:
-                draw_tracked_object(frame_data, obj)
-            outgoing_data.put(Packet(PacketType.IMAGE, BROADCAST_DEST, frame_data))
+            outgoing_data.put(
+                Packet(PacketType.CONTROL, BROADCAST_DEST, {"frame_detections": detections})
+            )
+            if time.time() - previous_transmit_time > transmit_delay:
+                previous_transmit_time = time.time()
+                outgoing_data.put(Packet(PacketType.IMAGE, BROADCAST_DEST, frame_data))
 
             if not received_data.empty():
                 msg = received_data.get()
@@ -47,10 +52,6 @@ def main() -> None:
                     print("Received image")
                 else:
                     print(f"Received ack: {msg.payload}")
-            yaw += 1
-            if yaw == 360:
-                yaw = 0
-            time.sleep(1 / 60)
     except KeyboardInterrupt:
         cam.shutdown()
         server.shutdown()

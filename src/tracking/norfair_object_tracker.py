@@ -18,7 +18,7 @@ class NorfairObjectTracker(ObjectTracker):
         self.tracker = Tracker(
             distance_function="euclidean",
             distance_threshold=300,
-            hit_counter_max=15,
+            hit_counter_max=5,
             initialization_delay=2,
         )
 

@@ -36,9 +36,26 @@ class YoloModel(VisionModel):
     def __init__(self, object_tracker: ObjectTracker, yolo_file: str = "yolo11m.pt"):
         super().__init__(object_tracker)
         self.model = YOLO(yolo_file, verbose=False)
-        self.model.to("mps")
         self.class_names = self.model.names
+        self.valid_names = set(
+            (
+                "rockets",
+                "rocket",
+                "trails",
+                "boat",
+                "airplane",
+                "kite",
+                "person",
+                "parachute",
+                "descending_rocket",
+            )
+        )
 
     def _process_frame(self, frame: cv2.typing.MatLike) -> list[DetectedObject]:
         results = self.model(frame, conf=0.1)
-        return yolo_output_to_detected_objects(results, self.class_names)
+        detected_objects = yolo_output_to_detected_objects(results, self.class_names)
+        valid_objects = filter(
+            lambda obj: obj.class_name in self.valid_names or "rocket" in obj.class_name,
+            detected_objects,
+        )
+        return valid_objects
