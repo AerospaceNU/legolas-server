@@ -25,6 +25,12 @@ class PIDGimbalController:
         self.integral = 0
         self.last_time = time.time()
 
+    def set_Kp(self, value):
+        self.Kp = value
+
+    def set_Ki(self, value):
+        self.Ki = value
+
     def process(self, pixel_err):
         current_time = time.time()
         dt = current_time - self.last_time

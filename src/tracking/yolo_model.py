@@ -48,6 +48,7 @@ class YoloModel(VisionModel):
                 "person",
                 "parachute",
                 "descending_rocket",
+                "laptop",
             )
         )
 

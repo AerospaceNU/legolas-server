@@ -49,6 +49,9 @@ class CameraCapture(VideoInput):
     def _run(self):
         while self.running:
             _, cap_frame = self.cap.read()
+            if self.camera_type == CameraType.NVARGUS:
+                cap_frame = cv2.flip(cap_frame, 0)
+                cap_frame = cv2.flip(cap_frame, 1)
             with self.lock:
                 self.frame = cap_frame
             time.sleep(0.00001)

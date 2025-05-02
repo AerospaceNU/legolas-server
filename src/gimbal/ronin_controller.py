@@ -74,14 +74,30 @@ class CanMessage:
         return cls(packet_data, command_type)
 
 
+def is_jetson():
+    try:
+        with open("/proc/device-tree/model", "r") as f:
+            return "NVIDIA" in f.read()
+    except FileNotFoundError:
+        return False
+
+
 class RoninController:
     def __init__(self, can_bus):
-        self._bus = can.interface.Bus(bustype="socketcan", channel=can_bus, bitrate=1000000)
 
         self._send_id = 0x223
         self._recv_id = 0x222
+        self.yaw = 0
+        self.roll = 0
+        self.pitch = 0
+        if not is_jetson():
+            self.jetson = False
+            return
+        self._bus = can.interface.Bus(bustype="socketcan", channel=can_bus, bitrate=1000000)
 
     def _send_cmd(self, payload: bytes):
+        if not self.jetson:
+            return
         message = CanMessage(payload)
         data_bytes = message.to_bytes()
         while len(data_bytes) != 0:
@@ -95,6 +111,14 @@ class RoninController:
                 data_bytes = data_bytes[8:]
             except can.CanError as e:
                 print(f"CAN transmit error {e}")
+
+    def set_yaw(self, value):
+        self.yaw = value
+        self.set_gimbal_speed(self.yaw, self.roll, self.pitch)
+
+    def set_pitch(self, value):
+        self.pitch = value
+        self.set_gimbal_speed(self.yaw, self.roll, self.pitch)
 
     def set_position_control(self, yaw, roll, pitch, ctrl_byte=0x01, time_for_action=1):
         yaw = int(yaw * 10.0)
