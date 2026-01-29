@@ -17,7 +17,13 @@ from tracking.yolo_model import YoloModel
 from video_input import VideoInput
 from video_writer import VideoWriter
 
-TRANSMIT_DOWNSCALE_FACTOR = 4
+
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"Device count: {torch.cuda.device_count()}")
+print(f"Current device: {torch.cuda.current_device()}")
+print(f"Device name: {torch.cuda.get_device_name(0)}")
+
+TRANSMIT_DOWNSCALE_FACTOR = 1
 
 transferable_rocket_names = set(
     (
@@ -55,7 +61,7 @@ def get_object_with_id(objects: list[TrackerObject], search_id: int):
         return result[0]
 
 
-RECORD_FILENAME = "recording.mp4"
+RECORD_FILENAME = "volley_2_recording.mp4"
 
 
 def main() -> None:
@@ -64,41 +70,49 @@ def main() -> None:
     outgoing_data: Queue[Packet] = Queue()
     received_data: Queue[Packet] = Queue()
 
-    yaw_Kp = 0.025
+    yaw_Kp = 0.0070
     yaw_Ki = 0.0002
 
-    pitch_Kp = 0.025
+    pitch_Kp = 0.02
     pitch_Ki = 0.0002
 
     ronin = RoninController("can0")
     yaw_controller = PIDGimbalController(
-        Kp=yaw_Kp, Ki=yaw_Ki, Kd=0.00, control_callback=lambda val: ronin.set_yaw(val)
+        Kp=yaw_Kp, Ki=yaw_Ki, Kd=0.00, control_callback=lambda val: ronin.set_yaw_joystick(val)
     )
     pitch_controller = PIDGimbalController(
         Kp=pitch_Kp,
         Ki=pitch_Ki,
         Kd=0,
-        control_callback=lambda val: ronin.set_pitch(val),
+        control_callback=lambda val: ronin.set_pitch_joystick(val),
     )
 
     server = SocketServer("0.0.0.0", 12345, outgoing_data, received_data)
     server.run()
-    cam: VideoInput = CameraCapture(CameraType.WEBCAM)
+    cam: VideoInput = CameraCapture(CameraType.WEBCAM, device_id=0)
     # cam = VideoReader("IMG_3061.MOV", rotation=cv2.ROTATE_90_CLOCKWISE)
     cam.start()
 
     norfair_model = NorfairObjectTracker()
-    yolo_model = YoloModel(norfair_model, "yolo11l.pt")
+    yolo_model = YoloModel(norfair_model, "100_640_merged.pt", 640)
 
-    transmit_delay = 1 / 10
+    transmit_delay = 1 / 7
     previous_transmit_time = time.time()
     previous_tracked_object: TrackerObject | None = None
-    currently_selected_id = 1
+    currently_selected_id = None
 
     video_recorder = None
 
+    previous_loop_time = time.time()
+
+    # ronin.set_pitch_position(100)
+    # ronin.set_yaw_position(100)
+    # ronin.set_roll_position(100)
+
     try:
         while True:
+            print(f"Previous loop time was {time.time() - previous_loop_time}")
+            previous_loop_time = time.time()
             frame_data = cam.get_frame()
             frame_height, frame_width = frame_data.shape[:2]
 
@@ -106,13 +120,19 @@ def main() -> None:
             if yolo_model is not None:
                 try:
                     detections = yolo_model.update(frame_data)
-                except:
+                except Exception as e:
+                    print(f"\n{'='*60}")
+                    print(f"YOLO ERROR: {e}")
+                    print(f"{'='*60}")
+                    import traceback
+                    traceback.print_exc()
+                    print(f"{'='*60}\n")
                     detections = []
             else:
                 detections = []
 
-            if video_recorder is None:
-                video_recorder = VideoWriter("record.mp4", frame_size=(frame_width, frame_height))
+            # if video_recorder is None:
+            #     video_recorder = VideoWriter("scan_volley_2.mp4", fps=30, frame_size=(frame_width, frame_height))
             currently_selected: TrackerObject | None = get_object_with_id(
                 detections, currently_selected_id
             )
@@ -123,7 +143,7 @@ def main() -> None:
                 cx, cy = bounding_box_center(target.bbox)
 
                 error_x = cx - center_x
-                error_y = cy - center_y
+                error_y = cy - (center_y * 1.2)
                 print(f"Frame center is {center_x}, {center_y}")
                 print(f"Object center is {cx}, {cy}")
                 print(f"Error X: {error_x}, Error Y: {error_y}")
@@ -203,19 +223,19 @@ def main() -> None:
                             )
                     if "gimbalParams" in payload:
                         params = payload["gimbalParams"]
-                        if "yaw" in params:
-                            yaw = params["yaw"]
-                            if "kp" in yaw:
-                                yaw_controller.set_Kp(yaw["kp"])
-                            if "ki" in yaw:
-                                yaw_controller.set_Ki(yaw["ki"])
-                        if "pitch" in params:
-                            pitch = params["pitch"]
-                            if "kp" in pitch:
-                                pitch_controller.set_Kp(pitch["kp"])
-                            if "ki" in pitch:
-                                pitch_controller.set_Ki(pitch["ki"])
-                    if "yoloModel" in params:
+                        # if "yaw" in params:
+                        #     yaw = params["yaw"]
+                        #     if "kp" in yaw:
+                        #         yaw_controller.set_Kp(yaw["kp"])
+                        #     if "ki" in yaw:
+                        #         yaw_controller.set_Ki(yaw["ki"])
+                        # if "pitch" in params:
+                        #     pitch = params["pitch"]
+                        #     if "kp" in pitch:
+                        #         pitch_controller.set_Kp(pitch["kp"])
+                        #     if "ki" in pitch:
+                        #         pitch_controller.set_Ki(pitch["ki"])
+                    if "yoloModel" in payload:
                         desired_model_name = params["yoloModel"]
                         # Delete and free the current model if it exists
                         if yolo_model is not None:
@@ -234,6 +254,7 @@ def main() -> None:
     except KeyboardInterrupt:
         cam.shutdown()
         server.shutdown()
+
         print("Goodbye!")
 
 

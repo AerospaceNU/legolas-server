@@ -1,5 +1,7 @@
 # legolas-server
-
+python version 3.10
+dependency needs to be 3.10 on nvidia jetson
+scp to download tracking model
 
 ## About
 This is the server repository for the LEGOLAS IRAD project. The server runs on the NVIDIA Jetson compute module connected to the tracking gimbal and camera system.

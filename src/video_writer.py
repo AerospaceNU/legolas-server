@@ -1,4 +1,7 @@
+from dataclasses import asdict
 import os
+
+import json
 
 import cv2
 
@@ -10,15 +13,15 @@ class VideoWriter:
         prefix, ext = os.path.splitext(filename)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         self.standard_writer = cv2.VideoWriter(filename, fourcc, fps, frame_size, True)
+        if not self.standard_writer.isOpened():
+            raise ValueError("Not opened")
         if include_annotations:
-            annotated_name = f"{prefix}_annotated{ext}"
-            self.annotated_writer = cv2.VideoWriter(annotated_name, fourcc, fps, frame_size, True)
+            self.annotations_log_name = f"{filename}.annotations"
         else:
-            self.annotated_writer = None
+            self.annotations_log_name = None
         self.frame_size = frame_size
 
     def write(self, frame, detections=None):
-        frame = frame.copy()
         if detections is None:
             detections = []
         # Resize if frame size mismatches
@@ -26,12 +29,11 @@ class VideoWriter:
             frame = cv2.resize(frame, self.frame_size)
         self.standard_writer.write(frame)
 
-        if self.annotated_writer is not None:
-            for detection in detections:
-                draw_tracked_object(frame, detection)
-            self.annotated_writer.write(frame)
+        if self.annotations_log_name is not None:
+            dict_list = [asdict(entry) for entry in detections]
+            with open(self.annotations_log_name, "a") as f:
+                f.write(json.dumps(dict_list) + '\n')
 
     def release(self):
+        print("releasing")
         self.standard_writer.release()
-        if self.annotated_writer is not None:
-            self.annotated_writer.release()

@@ -18,7 +18,7 @@ class VisionModel(ABC):
         self.object_tracker = object_tracker
 
     @abstractmethod
-    def _process_frame(self, frame: cv2.typing.MatLike) -> list[DetectedObject]:
+    def _process_frame(self, frame) -> list[DetectedObject]:
         """Process an individual frame and output the detections.
 
         Note that this is just a simple list of detected objects with no knowledge
@@ -32,7 +32,7 @@ class VisionModel(ABC):
         """
         pass
 
-    def update(self, frame: cv2.typing.MatLike) -> list[TrackerObject]:
+    def update(self, frame) -> list[TrackerObject]:
         """Update the tracker with a new frame
 
         Args:

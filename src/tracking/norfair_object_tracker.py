@@ -16,9 +16,9 @@ class NorfairObjectTracker(ObjectTracker):
         """Initialize the object tracker"""
         super().__init__()
         self.tracker = Tracker(
-            distance_function="euclidean",
+            distance_function="mean_euclidean",
             distance_threshold=300,
-            hit_counter_max=5,
+            hit_counter_max=8,
             initialization_delay=2,
         )
 

@@ -18,12 +18,22 @@ class CameraType(Enum):
 
 class CameraCapture(VideoInput):
 
-    def __init__(self, camera_type: CameraType):
+    def __init__(self, camera_type: CameraType, device_id=None):
+        """
+        Initialize camera capture
+        
+        Args:
+            camera_type: Type of camera (WEBCAM or NVARGUS)
+            device_id: Device index for webcam (default: 1 for USB cameras on Jetson)
+        """
         self.cap = None
         self.running = False
         self.thread = Thread(target=self._run)
         self.lock = Lock()
         self.camera_type = camera_type
+        # Default to video1 for WEBCAM (USB camera on Jetson Orin)
+        # video0 is typically the CSI camera
+        self.device_id = device_id if device_id is not None else (1 if camera_type == CameraType.WEBCAM else 0)
 
     def start(self):
         if self.camera_type == CameraType.NVARGUS:
@@ -36,12 +46,19 @@ class CameraCapture(VideoInput):
                 cv2.CAP_GSTREAMER,
             )
         elif self.camera_type == CameraType.WEBCAM:
-            make_cap = lambda: cv2.VideoCapture(0)
+            # Use the specified device_id (defaults to 1 for USB camera)
+            make_cap = lambda: cv2.VideoCapture(self.device_id)
         else:
             raise ValueError("Invalid camera type")
+        
+        print(f"Opening camera: {self.camera_type.name} at device {self.device_id if self.camera_type == CameraType.WEBCAM else 'GStreamer'}")
         self.cap = make_cap()
+        
         if not self.cap.isOpened():
-            raise ValueError("Error: Unable to access the webcam.")
+            raise ValueError(f"Error: Unable to access the webcam at /dev/video{self.device_id}. "
+                           f"Check permissions: sudo chmod 666 /dev/video{self.device_id}")
+        
+        print(f"✓ Camera opened successfully")
         _, self.frame = self.cap.read()
         self.running = True
         self.thread.start()
@@ -57,7 +74,6 @@ class CameraCapture(VideoInput):
             time.sleep(0.00001)
 
     def get_frame(self):
-
         return self.frame
 
     def shutdown(self):

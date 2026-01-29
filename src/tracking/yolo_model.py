@@ -33,9 +33,16 @@ def yolo_output_to_detected_objects(results, class_names) -> list[DetectedObject
 
 class YoloModel(VisionModel):
 
-    def __init__(self, object_tracker: ObjectTracker, yolo_file: str = "yolo11m.pt"):
+    def __init__(self, object_tracker: ObjectTracker, yolo_file: str = "weights.pt", image_size=320):
         super().__init__(object_tracker)
+        self.image_size = image_size
+        
+        # Initialize YOLO model and force it to use GPU
+        print("Loading YOLO model...")
         self.model = YOLO(yolo_file, verbose=False)
+        self.model.to('cuda')  # Force GPU usage
+        print(f"✓ YOLO model loaded on device: {next(self.model.model.parameters()).device}")
+        
         self.class_names = self.model.names
         self.valid_names = set(
             (
@@ -52,8 +59,9 @@ class YoloModel(VisionModel):
             )
         )
 
-    def _process_frame(self, frame: cv2.typing.MatLike) -> list[DetectedObject]:
-        results = self.model(frame, conf=0.1)
+    def _process_frame(self, frame) -> list[DetectedObject]:
+        # Inference on GPU
+        results = self.model(frame, conf=0.55, imgsz=self.image_size, device='cuda')
         detected_objects = yolo_output_to_detected_objects(results, self.class_names)
         valid_objects = filter(
             lambda obj: obj.class_name in self.valid_names or "rocket" in obj.class_name,
