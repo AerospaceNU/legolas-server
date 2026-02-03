@@ -150,6 +150,11 @@ def main() -> None:
                 yaw_controller.process(error_x)
                 pitch_controller.process(-1 * error_y)
 
+                yaw_angle, pitch_angle, roll_angle = ronin.delta_to_gimbal_angles(error_x, error_y, frame_width, frame_height)
+                ronin.set_yaw_position(yaw_angle)
+                ronin.set_pitch_position(pitch_angle)
+                ronin.set_roll_position(roll_angle)
+
                 previous_tracked_object = target
             elif currently_selected_id is not None:
                 if len(detections) != 0:
