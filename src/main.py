@@ -71,20 +71,22 @@ def main() -> None:
     outgoing_data: Queue[Packet] = Queue()
     received_data: Queue[Packet] = Queue()
 
-    yaw_Kp = 0.0070
-    yaw_Ki = 0.0002
+    yaw_Kp = 0.18
+    yaw_Ki = 0.005 
+    yaw_Kd = 0.0
 
-    pitch_Kp = 0.02
-    pitch_Ki = 0.0002
+    pitch_Kp = 0.08 #works good
+    pitch_Ki = 0.005 #not much testing with changing this but its ok for now
+    pitch_Kd = 0.0
 
     ronin = RoninController("can0")
     yaw_controller = PIDGimbalController(
-        Kp=yaw_Kp, Ki=yaw_Ki, Kd=0.00, control_callback=lambda val: ronin.set_yaw_joystick(val)
+        Kp=yaw_Kp, Ki=yaw_Ki, Kd=yaw_Kd, control_callback=lambda val: ronin.set_yaw_joystick(val)
     )
     pitch_controller = PIDGimbalController(
         Kp=pitch_Kp,
         Ki=pitch_Ki,
-        Kd=0,
+        Kd=pitch_Kd,
         control_callback=lambda val: ronin.set_pitch_joystick(val),
     )
 
@@ -106,9 +108,7 @@ def main() -> None:
 
     previous_loop_time = time.time()
 
-    # ronin.set_pitch_position(100)
-    # ronin.set_yaw_position(100)
-    # ronin.set_roll_position(100)
+    ronin.reset_to_zero()
 
     try:
         while True:
@@ -188,15 +188,7 @@ def main() -> None:
                 yaw_angle, pitch_angle, roll_angle = ronin.delta_to_gimbal_angles(error_x, error_y, frame_width, frame_height)
                 print(f"[GIMBAL CMD] Yaw: {yaw_angle:.2f}, Pitch: {pitch_angle:.2f}, Roll: {roll_angle:.2f}")
 
-                ronin.set_yaw_position(yaw_angle)
-                ronin.set_pitch_position(pitch_angle)
-                ronin.set_roll_position(roll_angle)
                 print(f"[GIMBAL] Commands sent!")
-
-                yaw_angle, pitch_angle, roll_angle = ronin.delta_to_gimbal_angles(error_x, error_y, frame_width, frame_height)
-                ronin.set_yaw_position(yaw_angle)
-                ronin.set_pitch_position(pitch_angle)
-                ronin.set_roll_position(roll_angle)
 
                 previous_tracked_object = target
             else:
