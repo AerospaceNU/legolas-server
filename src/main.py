@@ -56,6 +56,7 @@ def get_object_with_id(objects: list[TrackerObject], search_id: int):
     result = list(filter(lambda detection: detection.persistent_id == search_id, objects))
 
     if len(result) == 0:
+        print("No match on id")
         return None
     else:
         return result[0]
@@ -136,21 +137,69 @@ def main() -> None:
             currently_selected: TrackerObject | None = get_object_with_id(
                 detections, currently_selected_id
             )
+            print("DEBUG detections count:", len(detections))
+            print("Currently selected ID:", currently_selected_id)
+            print("Currently selected object:", currently_selected)
+            # try:
+            #     target = currently_selected
+            #     # print(target.bbox)
+            #     cx, cy = bounding_box_center(target.bbox)
+
+            #     error_x = cx - center_x
+            #     error_y = cy - (center_y * 1.2)
+            #     print(f"Frame center is {center_x}, {center_y}")
+            #     print(f"Object center is {cx}, {cy}")
+            #     print(f"Error X: {error_x}, Error Y: {error_y}")
+            #     yaw_controller.process(error_x)
+            #     pitch_controller.process(-1 * error_y)
+
+            #     yaw_angle, pitch_angle, roll_angle = ronin.delta_to_gimbal_angles(error_x, error_y, frame_width, frame_height)
+            #     ronin.set_yaw_position(yaw_angle)
+            #     ronin.set_pitch_position(pitch_angle)
+            #     ronin.set_roll_position(roll_angle)
+
+            #     previous_tracked_object = target
+            # except Exception as e:
+            #     print("error detecting objects: ", e)
+            #     pass
+
+
+            if currently_selected is None and len(detections) > 0:
+                currently_selected = detections[0]  # Or pick based on criteria
+                print(f"[AUTO-SELECT] No ID selected, picking first detection (ID: {currently_selected.persistent_id}, class: {currently_selected.class_name})")
 
             if currently_selected is not None:
+                print(f"[TRACKING] Target acquired - ID: {currently_selected.persistent_id}, class: {currently_selected.class_name}")
+
                 target = currently_selected
-                print(target.bbox)
                 cx, cy = bounding_box_center(target.bbox)
 
                 error_x = cx - center_x
                 error_y = cy - (center_y * 1.2)
-                print(f"Frame center is {center_x}, {center_y}")
-                print(f"Object center is {cx}, {cy}")
-                print(f"Error X: {error_x}, Error Y: {error_y}")
+
+                print(f"[POSITION] Frame center: ({center_x:.1f}, {center_y:.1f})")
+                print(f"[POSITION] Object center: ({cx:.1f}, {cy:.1f})")
+                print(f"[ERROR] X: {error_x:.1f}, Y: {error_y:.1f}")
+
                 yaw_controller.process(error_x)
                 pitch_controller.process(-1 * error_y)
+                print(f"[PID] Yaw processed error: {error_x:.1f}, Pitch processed error: {-1 * error_y:.1f}")
+
+                yaw_angle, pitch_angle, roll_angle = ronin.delta_to_gimbal_angles(error_x, error_y, frame_width, frame_height)
+                print(f"[GIMBAL CMD] Yaw: {yaw_angle:.2f}, Pitch: {pitch_angle:.2f}, Roll: {roll_angle:.2f}")
+
+                ronin.set_yaw_position(yaw_angle)
+                ronin.set_pitch_position(pitch_angle)
+                ronin.set_roll_position(roll_angle)
+                print(f"[GIMBAL] Commands sent!")
 
                 previous_tracked_object = target
+            else:
+                print(f"[IDLE] No target - detections: {len(detections)}, selected_id: {currently_selected_id}")
+
+
+            if currently_selected is not None:
+                pass
             elif currently_selected_id is not None:
                 if len(detections) != 0:
                     # We want to pick the object that is closest to the previously tracked object
