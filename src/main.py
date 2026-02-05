@@ -193,6 +193,11 @@ def main() -> None:
                 ronin.set_roll_position(roll_angle)
                 print(f"[GIMBAL] Commands sent!")
 
+                yaw_angle, pitch_angle, roll_angle = ronin.delta_to_gimbal_angles(error_x, error_y, frame_width, frame_height)
+                ronin.set_yaw_position(yaw_angle)
+                ronin.set_pitch_position(pitch_angle)
+                ronin.set_roll_position(roll_angle)
+
                 previous_tracked_object = target
             else:
                 print(f"[IDLE] No target - detections: {len(detections)}, selected_id: {currently_selected_id}")
