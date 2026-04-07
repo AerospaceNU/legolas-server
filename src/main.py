@@ -92,7 +92,7 @@ def main() -> None:
 
     server = SocketServer("0.0.0.0", 12345, outgoing_data, received_data)
     server.run()
-    cam: VideoInput = CameraCapture(CameraType.NVARGUS)
+    cam: VideoInput = CameraCapture(CameraType.NVARGUS, device_id=0)
     # cam = VideoReader("IMG_3061.MOV", rotation=cv2.ROTATE_90_CLOCKWISE)
     cam.start()
 
