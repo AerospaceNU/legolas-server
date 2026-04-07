@@ -71,23 +71,23 @@ def main() -> None:
     outgoing_data: Queue[Packet] = Queue()
     received_data: Queue[Packet] = Queue()
 
-    yaw_Kp = 0.18
-    yaw_Ki = 0.005 
-    yaw_Kd = 0.0
+    yaw_Kp = 0.08
+    yaw_Ki = 0.003
+    yaw_Kd = 0.02
 
-    pitch_Kp = 0.08 #works good
-    pitch_Ki = 0.005 #not much testing with changing this but its ok for now
-    pitch_Kd = 0.0
+    pitch_Kp = 0.04
+    pitch_Ki = 0.003
+    pitch_Kd = 0.01
 
     ronin = RoninController("can0")
     yaw_controller = PIDGimbalController(
-        Kp=yaw_Kp, Ki=yaw_Ki, Kd=yaw_Kd, control_callback=lambda val: ronin.set_yaw_joystick(val)
+        Kp=yaw_Kp, Ki=yaw_Ki, Kd=yaw_Kd, control_callback=lambda val: ronin.set_yaw_joystick(-val)  # negate: positive pixel error = right, but positive yaw speed = left
     )
     pitch_controller = PIDGimbalController(
         Kp=pitch_Kp,
         Ki=pitch_Ki,
         Kd=pitch_Kd,
-        control_callback=lambda val: ronin.set_pitch_joystick(val),
+        control_callback=lambda val: ronin.set_pitch_joystick(val),  # no negate: positive pixel error = down, and positive pitch speed = down
     )
 
     server = SocketServer("0.0.0.0", 12345, outgoing_data, received_data)
@@ -182,35 +182,23 @@ def main() -> None:
                 # print(f"[AUTO-SELECT] No ID selected, picking first detection (ID: {currently_selected.persistent_id}, class: {currently_selected.class_name})")
 
             if currently_selected is not None:
-                # print(f"[TRACKING] Target acquired - ID: {currently_selected.persistent_id}, class: {currently_selected.class_name}")
-
                 target = currently_selected
                 cx, cy = bounding_box_center(target.bbox)
 
                 error_x = cx - center_x
                 error_y = cy - (center_y * 1.0)
 
-                print(f"[POSITION] Frame center: ({center_x:.1f}, {center_y:.1f})")
-                print(f"[POSITION] Object center: ({cx:.1f}, {cy:.1f})")
-                print(f"[ERROR] X: {error_x:.1f}, Y: {error_y:.1f}")
+                yaw_out = yaw_controller.process(error_x)
+                pitch_out = pitch_controller.process(error_y)
 
-                yaw_controller.process(error_x)
-                pitch_controller.process(-1 * error_y)
-
-                end_time = time.time()
-
-                print("Time to complete getting the frames --> Yolo --> outputs --> gimbal: ", end_time - start_time)
-
-                # print(f"[PID] Yaw processed error: {error_x:.1f}, Pitch processed error: {-1 * error_y:.1f}")
-
-                yaw_angle, pitch_angle, roll_angle = ronin.delta_to_gimbal_angles(error_x, error_y, frame_width, frame_height)
-                # ronin.set_yaw_position(yaw_angle)
-                # ronin.set_pitch_position(pitch_angle)
-                # ronin.set_roll_position(roll_angle)
-                
-                # print(f"[GIMBAL CMD] Yaw: {yaw_angle:.2f}, Pitch: {pitch_angle:.2f}, Roll: {roll_angle:.2f}")
-
-                # print(f"[GIMBAL] Commands sent!")
+                loop_dt = time.time() - start_time
+                print(
+                    f"[TRACK] id={target.persistent_id} cls={target.class_name} "
+                    f"pos=({cx:.0f},{cy:.0f}) center=({center_x:.0f},{center_y:.0f}) "
+                    f"err=({error_x:+.0f},{error_y:+.0f}) loop_dt={loop_dt:.3f}s"
+                )
+                print(f"  [YAW]   {yaw_out}")
+                print(f"  [PITCH] {pitch_out}")
 
                 previous_tracked_object = target
             else:
