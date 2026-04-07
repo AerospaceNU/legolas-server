@@ -4,10 +4,12 @@ import time
 def test():
     ronin = RoninController("can0")
 
-    ronin.set_pitch_position(0)
-    ronin.set_yaw_position(0)
-    ronin.set_roll_position(0)
-    ronin.get_current_position()
+    # ronin.reset_to_zero()
+
+    ronin.set_pitch_position(200)
+    ronin.set_yaw_position(120)
+    ronin.set_roll_position(20)
+    # ronin.get_current_position()
 
     print("RONIN: Jetson mode =", ronin.jetson)
  

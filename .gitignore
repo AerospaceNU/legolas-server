@@ -8,3 +8,4 @@ dist
 *.MOV 
 *.pt 
 *.mp4
+venv-310/

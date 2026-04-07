@@ -13,7 +13,7 @@ from legolas_common.src.packet_types import BROADCAST_DEST, Packet, PacketType
 from legolas_common.src.socket_server import SocketServer
 from legolas_common.src.tracked_object import BoundingBox, TrackerObject
 from tracking.norfair_object_tracker import NorfairObjectTracker
-from tracking.yolo_model import YoloModel
+from tracking.yolo_model import YoloModel, YoloThread
 from video_input import VideoInput
 from video_writer import VideoWriter
 
@@ -56,7 +56,7 @@ def get_object_with_id(objects: list[TrackerObject], search_id: int):
     result = list(filter(lambda detection: detection.persistent_id == search_id, objects))
 
     if len(result) == 0:
-        print("No match on id")
+        # print("No match on id")
         return None
     else:
         return result[0]
@@ -71,7 +71,7 @@ def main() -> None:
     outgoing_data: Queue[Packet] = Queue()
     received_data: Queue[Packet] = Queue()
 
-    yaw_Kp = 0.18
+    yaw_Kp = 0.08
     yaw_Ki = 0.005 
     yaw_Kd = 0.0
 
@@ -81,7 +81,7 @@ def main() -> None:
 
     ronin = RoninController("can0")
     yaw_controller = PIDGimbalController(
-        Kp=yaw_Kp, Ki=yaw_Ki, Kd=yaw_Kd, control_callback=lambda val: ronin.set_yaw_joystick(val)
+        Kp=yaw_Kp, Ki=yaw_Ki, Kd=yaw_Kd, control_callback=lambda val: ronin.set_yaw_joystick(-val)
     )
     pitch_controller = PIDGimbalController(
         Kp=pitch_Kp,
@@ -92,12 +92,14 @@ def main() -> None:
 
     server = SocketServer("0.0.0.0", 12345, outgoing_data, received_data)
     server.run()
-    cam: VideoInput = CameraCapture(CameraType.NVARGUS)
+    cam: VideoInput = CameraCapture(CameraType.WEBCAM, device_id=0)
     # cam = VideoReader("IMG_3061.MOV", rotation=cv2.ROTATE_90_CLOCKWISE)
     cam.start()
 
     norfair_model = NorfairObjectTracker()
     yolo_model = YoloModel(norfair_model, r"/ssd/legolas-nuli-launch/legolas-server/model_weights.pt", 320) #was 640px
+    yolo_thread = YoloThread(yolo_model)
+    yolo_thread.start()
 
     transmit_delay = 1 / 7
     previous_transmit_time = time.time()
@@ -122,17 +124,21 @@ def main() -> None:
             previous_loop_time = time.time()
 
             frame_data = cam.get_frame() #get the frame to either send to YOLO model, or drain the buffer (skipping the frame)
+            yolo_thread.update_frame(frame_data)
 
-            frame_switch += 1
-            if frame_switch % 4 == 0: #skips every 4th frame
-                continue
+            # frame_switch += 1
+            # if frame_switch % 4 == 0: #skips every 4th frame
+            #     continue
             
             frame_height, frame_width = frame_data.shape[:2]
 
             center_x, center_y = frame_width / 2, frame_height / 2
-            if yolo_model is not None:
+            if yolo_thread is not None:
                 try:
-                    detections = yolo_model.update(frame_data)
+                    # detections = yolo_model.update(frame_data)
+                    # detections = yolo_thread.get_detections_nowait()
+                    detections = yolo_thread.get_detections()
+
                 except Exception as e:
                     print(f"\n{'='*60}")
                     print(f"YOLO ERROR: {e}")
@@ -144,55 +150,39 @@ def main() -> None:
             else:
                 detections = []
 
-            # if video_recorder is None:
-            #     video_recorder = VideoWriter("scan_volley_2.mp4", fps=30, frame_size=(frame_width, frame_height))
             currently_selected: TrackerObject | None = get_object_with_id(
                 detections, currently_selected_id
             )
+
+            # if video_recorder is None:
+            #     video_recorder = VideoWriter("scan_volley_2.mp4", fps=30, frame_size=(frame_width, frame_height))
+            
             # print("DEBUG detections count:", len(detections))
             # print("Currently selected ID:", currently_selected_id)
             # print("Currently selected object:", currently_selected)
-
-            # try:
-            #     target = currently_selected
-            #     # print(target.bbox)
-            #     cx, cy = bounding_box_center(target.bbox)
-
-            #     error_x = cx - center_x
-            #     error_y = cy - (center_y * 1.2)
-            #     print(f"Frame center is {center_x}, {center_y}")
-            #     print(f"Object center is {cx}, {cy}")
-            #     print(f"Error X: {error_x}, Error Y: {error_y}")
-            #     yaw_controller.process(error_x)
-            #     pitch_controller.process(-1 * error_y)
-
-            #     yaw_angle, pitch_angle, roll_angle = ronin.delta_to_gimbal_angles(error_x, error_y, frame_width, frame_height)
-            #     ronin.set_yaw_position(yaw_angle)
-            #     ronin.set_pitch_position(pitch_angle)
-            #     ronin.set_roll_position(roll_angle)
-
-            #     previous_tracked_object = target
-            # except Exception as e:
-            #     print("error detecting objects: ", e)
-            #     pass
-
+            # print("[DETECTIONS]: ", detections)
 
             if currently_selected is None and len(detections) > 0:
                 currently_selected = detections[0]  # Or pick based on criteria
                 # print(f"[AUTO-SELECT] No ID selected, picking first detection (ID: {currently_selected.persistent_id}, class: {currently_selected.class_name})")
 
             if currently_selected is not None:
-                # print(f"[TRACKING] Target acquired - ID: {currently_selected.persistent_id}, class: {currently_selected.class_name}")
+                print(f"[TRACKING] Target acquired - ID: {currently_selected.persistent_id}, class: {currently_selected.class_name}")
 
                 target = currently_selected
                 cx, cy = bounding_box_center(target.bbox)
 
-                error_x = cx - center_x
-                error_y = cy - (center_y * 1.0)
+                error_x = (cx - center_x) #/ frame_width
+                error_y = (cy - center_y) #/ frame_height
 
                 print(f"[POSITION] Frame center: ({center_x:.1f}, {center_y:.1f})")
                 print(f"[POSITION] Object center: ({cx:.1f}, {cy:.1f})")
                 print(f"[ERROR] X: {error_x:.1f}, Y: {error_y:.1f}")
+
+
+                # if abs(math.sqrt(error_x**2 + error_y**2)) > 0.02:
+                #     yaw_controller.process(error_x)
+                #     pitch_controller.process(-1 * error_y)
 
                 yaw_controller.process(error_x)
                 pitch_controller.process(-1 * error_y)
@@ -213,8 +203,8 @@ def main() -> None:
                 # print(f"[GIMBAL] Commands sent!")
 
                 previous_tracked_object = target
-            else:
-                print(f"[IDLE] No target - detections: {len(detections)}, selected_id: {currently_selected_id}")
+            # else:
+            #     print(f"[IDLE] No target - detections: {len(detections)}, selected_id: {currently_selected_id}")
 
 
             if currently_selected is not None:
@@ -319,7 +309,8 @@ def main() -> None:
                     print("Received image")
                 else:
                     print(f"Received ack: {msg.payload}")
-    except KeyboardInterrupt:
+    finally:
+        yolo_thread.stop()
         cam.shutdown()
         server.shutdown()
 
