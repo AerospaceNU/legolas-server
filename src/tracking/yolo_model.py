@@ -1,4 +1,3 @@
-import cv2
 from ultralytics import YOLO  # type: ignore
 
 from legolas_common.src.tracked_object import BoundingBox, DetectedObject, Point2D
@@ -13,7 +12,6 @@ def yolo_output_to_detected_objects(results, class_names) -> list[DetectedObject
 
     for result in results:
         for box in result.boxes:
-            # Extract box coordinates
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             conf = float(box.conf[0])
             class_id = int(box.cls[0])
@@ -38,45 +36,17 @@ class YoloModel(VisionModel):
     def __init__(self, object_tracker: ObjectTracker, yolo_file: str = "weights.pt", image_size=320):
         super().__init__(object_tracker)
         self.image_size = image_size
-        
-        # Initialize YOLO model and force it to use GPU
+
         print("Loading YOLO model...")
         self.model = YOLO(yolo_file, verbose=False)
-        self.model.to('cuda')  # Force GPU usage
-        print(f"✓ YOLO model loaded on device: {next(self.model.model.parameters()).device}")
-        
+        self.model.to('cuda')
+        print(f"YOLO model loaded on device: {next(self.model.model.parameters()).device}")
+
         self.class_names = self.model.names
-        self.valid_names = set(
-            (
-                "rockets",
-                "rocket",
-                "trails",
-                "boat",
-                "airplane",
-                "kite",
-                "person",
-                "parachute",
-                "descending_rocket",
-                "laptop",
-            )
-        )
 
     def _process_frame(self, frame) -> list[DetectedObject]:
-        # Inference on GPU
         results = self.model(frame, conf=0.55, imgsz=self.image_size, device='cuda')
-        detected_objects = yolo_output_to_detected_objects(results, self.class_names)
-        valid_objects = filter(
-            lambda obj: obj.class_name in self.valid_names or "rocket" in obj.class_name,
-            detected_objects,
-        )
-        return valid_objects
-        # results = self.model(frame, conf=0.55, imgsz=self.image_size, device='cuda', verbose=False)
-        # detected_objects = yolo_output_to_detected_objects(results, self.class_names)
-        # return list(filter(
-        #     lambda obj: obj.class_name in self.valid_names or "rocket" in obj.class_name,
-        #     detected_objects,
-        # ))
-    
+        return yolo_output_to_detected_objects(results, self.class_names)
 
 
 class YoloThread:
@@ -104,7 +74,7 @@ class YoloThread:
         """Called from main loop to get the latest detections"""
         with self.lock:
             if not self.new_detections:
-                return []  # Signal that nothing new is available
+                return []
             self.new_detections = False
             return self.latest_detections
 

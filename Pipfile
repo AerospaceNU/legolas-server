@@ -9,6 +9,7 @@ opencv-contrib-python = "*"
 python-can = "*"
 pyserial = "*"
 norfair = "*"
+rich = "*"
 
 [dev-packages]
 isort = "*"
