@@ -1,4 +1,3 @@
-import sys
 import time
 import threading
 from datetime import datetime
@@ -130,11 +129,8 @@ class Dashboard:
         self.event_log = event_log
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
-        self._enabled = sys.stdout.isatty()
 
     def start(self):
-        if not self._enabled:
-            return
         self._thread.start()
 
     def stop(self):
@@ -151,4 +147,16 @@ class Dashboard:
                     live.update(_generate_layout(self.state, self.event_log))
                     time.sleep(0.25)
         except Exception:
-            pass
+            # Live display failed (no terminal capabilities) -- fall back to periodic stderr logging
+            import sys
+            while not self._stop_event.is_set():
+                s = self.state
+                pid_yaw = f"Y err={s.yaw_pid.error:+.0f} out={s.yaw_pid.output:+.2f}" if s.yaw_pid else "Y idle"
+                pid_pitch = f"P err={s.pitch_pid.error:+.0f} out={s.pitch_pid.output:+.2f}" if s.pitch_pid else "P idle"
+                target = f"ID={s.target_id}" if s.target_id is not None else "none"
+                print(
+                    f"[LEGOLAS] target={target} det={s.detection_count} {pid_yaw} {pid_pitch} dt={s.loop_dt:.3f}s",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                time.sleep(1.0)
