@@ -196,6 +196,9 @@ class RoninController:
         self.jetson = True
         self._bus = can.interface.Bus(bustype="socketcan", channel=can_bus, bitrate=1000000)
 
+        self.check_connection()  # ← add this
+
+
         # #sets the speed of the gimbal
         # self.set_yaw(300)
         # self.set_roll(300)
@@ -203,6 +206,52 @@ class RoninController:
         # time.sleep(2) #for some reason setting speed also moves the gimbal, so wait for that to 
         # #finish before resetting back to zero
         self.reset_to_zero()
+
+
+    def check_connection(self, duration=3.0):
+        """
+        Listen to the CAN bus and report what's talking.
+        If the gimbal is connected and powered, you should see 0x2E1 messages.
+        """
+        if not self.jetson:
+            print("[CONNECTION] Not on Jetson, skipping.")
+            return
+
+        print(f"[CONNECTION] Listening on CAN bus for {duration}s...")
+        deadline = time.time() + duration
+        seen_ids = {}
+
+        while time.time() < deadline:
+            try:
+                msg = self._bus.recv(timeout=0.1)
+                if msg is None:
+                    continue
+                aid = msg.arbitration_id
+                if aid not in seen_ids:
+                    seen_ids[aid] = 0
+                seen_ids[aid] += 1
+            except Exception as e:
+                print(f"[CONNECTION] Bus error: {e}")
+                continue
+
+        if not seen_ids:
+            print("[CONNECTION] ❌ No CAN traffic detected — check wiring/power")
+        else:
+            print(f"[CONNECTION] CAN IDs seen:")
+            for aid, count in sorted(seen_ids.items()):
+                label = ""
+                if aid == 0x2E1:
+                    label = " ← gimbal status broadcast ✓"
+                elif aid == 0x530:
+                    label = " ← gimbal reply channel"
+                elif aid == 0x223:
+                    label = " ← our own TX (loopback)"
+                print(f"  0x{aid:03X} — {count} messages{label}")
+
+            if 0x2E1 in seen_ids:
+                print("[CONNECTION] ✅ Gimbal is connected and broadcasting")
+            else:
+                print("[CONNECTION] ⚠️  CAN bus has traffic but gimbal (0x2E1) not seen — check gimbal power/baudrate")
 
 
     def _send_cmd(self, payload: bytes):
@@ -217,12 +266,42 @@ class RoninController:
                 is_extended_id=False,
             )
             try:
-                print("send")
+                # print("send")
+                # print(msg)
                 self._bus.send(msg)
-                print("sent")
+                # print("sent")
                 data_bytes = data_bytes[8:]
             except can.CanError as e:
                 print(f"CAN transmit error {e}")
+        # self._check_for_reply()
+
+
+    def _check_for_reply(self, timeout=0.5):
+        """Listen for any response from the gimbal after a command."""
+        # print(f"[RX] Listening for gimbal response...")
+        deadline = time.time() + timeout
+        got_any = False
+        while time.time() < deadline:
+            try:
+                msg = self._bus.recv(timeout=0.05)
+                if msg is None:
+                    continue
+                got_any = True
+                if msg.arbitration_id == self._recv_id:  # 0x530
+                    pass
+                    # print(f"[RX] Gimbal replied on 0x{msg.arbitration_id:03X}: {msg.data.hex()} ← command acknowledged")
+                elif msg.arbitration_id == 0x2E1:
+                    pass
+                    # print(f"[RX] Gimbal broadcast on 0x2E1: {msg.data.hex()} ← status/position update")
+                else:
+                    pass
+                    # print(f"[RX] Other CAN msg on 0x{msg.arbitration_id:03X}: {msg.data.hex()}")
+            except Exception:
+                continue
+        if not got_any:
+            pass
+            # print("[RX] No response from gimbal — it may be ignoring the command")
+
 
     def set_yaw_joystick(self, value):
         self.yaw = value
