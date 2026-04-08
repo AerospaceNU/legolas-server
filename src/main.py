@@ -63,6 +63,7 @@ def get_object_with_id(objects: list[TrackerObject], search_id: int):
 
 
 RECORD_FILENAME = "volley_2_recording.mp4"
+DETECTION_THRESHOLD = 100   # pixels of square to not adjust camera in
 
 
 def main() -> None:
@@ -73,11 +74,11 @@ def main() -> None:
 
     yaw_Kp = 0.08
     yaw_Ki = 0.005 
-    yaw_Kd = 0.0
+    yaw_Kd = 0.05
 
     pitch_Kp = 0.04
     pitch_Ki = 0.003
-    pitch_Kd = 0.01
+    pitch_Kd = 0.05
 
     ronin = RoninController("can0")
     yaw_controller = PIDGimbalController(
@@ -98,8 +99,8 @@ def main() -> None:
 
     norfair_model = NorfairObjectTracker()
     yolo_model = YoloModel(norfair_model, r"/ssd/legolas-nuli-launch/legolas-server/model_weights.pt", 320) #was 640px
-    yolo_thread = YoloThread(yolo_model)
-    yolo_thread.start()
+    # yolo_thread = YoloThread(yolo_model)
+    # yolo_thread.start()
 
     transmit_delay = 1 / 7
     previous_transmit_time = time.time()
@@ -124,7 +125,7 @@ def main() -> None:
             previous_loop_time = time.time()
 
             frame_data = cam.get_frame() #get the frame to either send to YOLO model, or drain the buffer (skipping the frame)
-            yolo_thread.update_frame(frame_data)
+            # yolo_thread.update_frame(frame_data)
 
             # frame_switch += 1
             # if frame_switch % 4 == 0: #skips every 4th frame
@@ -133,11 +134,11 @@ def main() -> None:
             frame_height, frame_width = frame_data.shape[:2]
 
             center_x, center_y = frame_width / 2, frame_height / 2
-            if yolo_thread is not None:
+            if yolo_model is not None:
                 try:
-                    # detections = yolo_model.update(frame_data)
+                    detections = yolo_model.update(frame_data)
                     # detections = yolo_thread.get_detections_nowait()
-                    detections = yolo_thread.get_detections()
+                    # detections = yolo_thread.get_detections()
 
                 except Exception as e:
                     print(f"\n{'='*60}")
@@ -173,8 +174,9 @@ def main() -> None:
                 error_x = (cx - center_x) #/ frame_width
                 error_y = (cy - center_y) #/ frame_height
 
-                yaw_out = yaw_controller.process(error_x)
-                pitch_out = pitch_controller.process(error_y)
+                if (error_x**2 + error_y**2)**.5 > DETECTION_THRESHOLD:
+                    yaw_out = yaw_controller.process(-0.2 * error_x)
+                    pitch_out = pitch_controller.process(-0.2 * error_y)
 
                 loop_dt = time.time() - start_time
                 print(
@@ -277,7 +279,7 @@ def main() -> None:
                         #     if "ki" in pitch:
                         #         pitch_controller.set_Ki(pitch["ki"])
                     if "yoloModel" in payload:
-                        desired_model_name = params["yoloModel"]
+                        desired_model_name = payload["yoloModel"]
                         # Delete and free the current model if it exists
                         if yolo_model is not None:
                             del yolo_model
@@ -293,7 +295,7 @@ def main() -> None:
                 else:
                     print(f"Received ack: {msg.payload}")
     finally:
-        yolo_thread.stop()
+        # yolo_thread.stop()
         cam.shutdown()
         server.shutdown()
 
